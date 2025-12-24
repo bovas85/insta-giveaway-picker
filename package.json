@@ -1,0 +1,30 @@
+{
+  "name": "insta-analyzer",
+  "version": "1.0.0",
+  "description": "Instagram Comment Analyzer",
+  "main": "index.ts",
+  "scripts": {
+    "serve": "ts-node src/server/index.ts",
+    "build": "tsc",
+    "start": "node dist/server/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/dotenv": "^6.1.1",
+    "@types/node": "^25.0.3",
+    "@types/puppeteer": "^5.4.7",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@types/express": "^5.0.6",
+    "@types/socket.io": "^3.0.1",
+    "axios": "^1.13.2",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "puppeteer": "^24.34.0",
+    "socket.io": "^4.8.3"
+  }
+}

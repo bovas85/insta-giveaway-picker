@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.env.*
+instagram-session
+temp_sessions
+*.log
+.DS_Store
+Thumbs.db
