@@ -8,3 +8,5 @@ temp_sessions
 .DS_Store
 Thumbs.db
 src/client/output.css
+*.csv
+scripts/.cache
