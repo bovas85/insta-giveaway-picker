@@ -371,12 +371,16 @@ io.on('connection', (socket) => {
   });
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`Server running at: http://localhost:${PORT}`);
-  console.log(`Admin Console at: http://localhost:${PORT}/admin`);
-  if (process.env.ACCESS_CODE) {
-    console.log('🔒 Access Code Protection: ENABLED');
-  } else {
-    console.log('⚠️ Access Code Protection: DISABLED (Anyone can access)');
-  }
-});
+export { app, httpServer, io };
+
+if (require.main === module) {
+  httpServer.listen(PORT, () => {
+    console.log(`Server running at: http://localhost:${PORT}`);
+    console.log(`Admin Console at: http://localhost:${PORT}/admin`);
+    if (process.env.ACCESS_CODE) {
+      console.log('🔒 Access Code Protection: ENABLED');
+    } else {
+      console.log('⚠️ Access Code Protection: DISABLED (Anyone can access)');
+    }
+  });
+}
