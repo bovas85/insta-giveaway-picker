@@ -2,11 +2,7 @@ import puppeteer, { Page } from 'puppeteer';
 import * as path from 'path';
 import * as fs from 'fs';
 import axios from 'axios';
-
-interface Config {
-  postUrl: string;
-  competitors: string[];
-}
+import { Config, FacebookPage, AnalysisResult, InstagramInternalUser } from './types';
 
 const DELAY = {
   short: 500,
@@ -29,11 +25,9 @@ async function getCommentersAPI(
       `https://graph.facebook.com/v18.0/me/accounts?fields=instagram_business_account,name&access_token=${accessToken}`,
     );
     const pages = accountsRes.data.data || [];
-    const page = pages.find((p: any) => p.instagram_business_account);
+    const page = pages.find((p: FacebookPage) => p.instagram_business_account);
 
     let igId = page?.instagram_business_account?.id;
-
-    // --- Fallback for "Hidden" Pages ---
 
     if (!igId) {
       const manualId = process.env.MANUAL_PAGE_ID;
@@ -71,7 +65,9 @@ async function getCommentersAPI(
     const mediaRes = await axios.get(
       `https://graph.facebook.com/v18.0/${igId}/media?fields=shortcode&limit=50&access_token=${accessToken}`,
     );
-    const media = mediaRes.data.data.find((m: any) => m.shortcode === shortcode);
+    const media = mediaRes.data.data.find(
+      (m: { shortcode: string; id: string }) => m.shortcode === shortcode,
+    );
 
     if (!media) {
       onLog('⚠️ Post not found in your recent media. (API only works for YOUR own posts)');
@@ -106,8 +102,14 @@ async function getCommentersAPI(
     }
 
     return commenters;
-  } catch (e: any) {
-    onLog(`❌ API Error: ${e.response?.data?.error?.message || e.message}`);
+  } catch (e: unknown) {
+    let message = 'Unknown API Error';
+    if (axios.isAxiosError(e)) {
+      message = e.response?.data?.error?.message || e.message;
+    } else if (e instanceof Error) {
+      message = e.message;
+    }
+    onLog(`❌ API Error: ${message}`);
     return null;
   }
 }
@@ -130,8 +132,9 @@ export async function openLoginBrowser(onLog: (m: string) => void) {
         '--disable-setuid-sandbox',
       ],
     });
-  } catch (e: any) {
-    onLog(`❌ Failed to launch browser: ${e.message}`);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    onLog(`❌ Failed to launch browser: ${msg}`);
     onLog('💡 Tip: Make sure no other Instagram Analyzer windows are open.');
     return;
   }
@@ -161,7 +164,7 @@ export async function openLoginBrowser(onLog: (m: string) => void) {
 export async function startAnalysis(
   config: Config,
   onLog: (msg: string) => void,
-  onResult: (result: any) => void,
+  onResult: (result: AnalysisResult) => void,
 ) {
   const startTime = Date.now();
   onLog('🚀 Starting Instagram Analyzer...');
@@ -227,9 +230,10 @@ export async function startAnalysis(
             '--disable-setuid-sandbox',
           ],
         });
-      } catch (e: any) {
-        onLog(`❌ Failed to launch browser: ${e.message}`);
-        onResult({ error: e.message });
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        onLog(`❌ Failed to launch browser: ${msg}`);
+        onResult({ error: msg });
         return;
       }
 
@@ -252,8 +256,9 @@ export async function startAnalysis(
         onLog(`🔍 Scraping comments from: ${config.postUrl}`);
         commenters = await scrapeCommenters(page, config.postUrl, config.competitors, onLog);
         await browser.close();
-      } catch (e: any) {
-        onLog(`❌ Scrape Error: ${e.message}`);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        onLog(`❌ Scrape Error: ${msg}`);
         if (browser) await browser.close();
         return;
       }
@@ -280,9 +285,10 @@ export async function startAnalysis(
           '--disable-setuid-sandbox',
         ],
       });
-    } catch (e: any) {
-      onLog(`❌ Failed to launch browser for analysis: ${e.message}`);
-      onResult({ error: e.message });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      onLog(`❌ Failed to launch browser for analysis: ${msg}`);
+      onResult({ error: msg });
       return;
     }
 
@@ -340,15 +346,17 @@ export async function startAnalysis(
         onLog('❌ No qualified users found.');
         onResult({ error: 'No qualified users found.', duration: durationSeconds });
       }
-    } catch (err: any) {
-      onLog(`❌ Error during analysis: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      onLog(`❌ Error during analysis: ${msg}`);
       throw err;
     } finally {
       if (browser) await browser.close();
     }
-  } catch (err: any) {
-    onLog(`❌ Critical Error: ${err.message}`);
-    onResult({ error: err.message });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    onLog(`❌ Critical Error: ${msg}`);
+    onResult({ error: msg });
   } finally {
     // --- Cleanup ---
     onLog('🧹 Cleaning up temp session...');
@@ -458,7 +466,8 @@ async function scrapeCommenters(
     const competitors = new Set(competitorsList.map((c: string) => c.toLowerCase()));
     const commentSpans = Array.from(document.querySelectorAll('div.html-div span[dir="auto"]'));
 
-    commentSpans.forEach((span: any) => {
+    commentSpans.forEach((s) => {
+      const span = s as HTMLElement;
       const textContent = span.innerText || '';
       if (!textContent.includes('@') || textContent.length < 5) return;
 
@@ -468,10 +477,10 @@ async function scrapeCommenters(
         if (!container || container.tagName === 'UL') break;
         const authorLink = container.querySelector(
           'a[href^="/"]:not([href*="/p/"]):not([href*="/reels/"])',
-        );
+        ) as HTMLElement | null;
         if (authorLink) {
           const href = authorLink.getAttribute('href');
-          const match = href.match(/^\/([a-zA-Z0-9_.]+)\/?$/);
+          const match = href ? href.match(/^\/([a-zA-Z0-9_.]+)\/?$/) : null;
           if (match) {
             const foundUser = match[1];
             if (
@@ -570,7 +579,9 @@ async function analyzeUser(
 
             // The API returns a list of users. Check if the exact full competitor is in the results.
             return (
-              data.users?.some((u: any) => u.username.toLowerCase() === comp.toLowerCase()) || false
+              data.users?.some(
+                (u: InstagramInternalUser) => u.username.toLowerCase() === comp.toLowerCase(),
+              ) || false
             );
           } catch (e) {
             return false;
@@ -593,8 +604,9 @@ async function analyzeUser(
     }
 
     return matches.length === sanitizedCompetitors.length;
-  } catch (e: any) {
-    onLog(`      ❌ Error analyzing user: ${e.message}`);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    onLog(`      ❌ Error analyzing user: ${msg}`);
     return false;
   }
 }

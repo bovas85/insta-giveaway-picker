@@ -7,6 +7,7 @@ import * as os from 'os';
 import dotenv from 'dotenv';
 import axios from 'axios';
 import { startAnalysis, openLoginBrowser } from './analyzer';
+import { FacebookPage, ActiveSession } from './types';
 
 dotenv.config();
 
@@ -53,19 +54,19 @@ app.get('/auth/debug', async (req, res) => {
       `https://graph.facebook.com/v18.0/me/permissions?access_token=${token}`,
     );
     const grantedPerms = permRes.data.data
-      .filter((p: any) => p.status === 'granted')
-      .map((p: any) => p.permission);
+      .filter((p: FacebookPage) => p.status === 'granted')
+      .map((p: FacebookPage) => p.permission);
 
     // Check Accounts (with extra fields)
     const response = await axios.get(
       `https://graph.facebook.com/v18.0/me/accounts?fields=name,id,instagram_business_account,tasks,is_published,category&access_token=${token}`,
     );
     const pages = response.data.data;
-    const validPages = pages.filter((p: any) => p.instagram_business_account);
+    const validPages = pages.filter((p: FacebookPage) => p.instagram_business_account);
 
     // --- Manual ID Check ---
     const manualId = process.env.MANUAL_PAGE_ID;
-    let manualResult = null;
+    let manualResult: (FacebookPage & { error?: string }) | null = null;
 
     if (manualId) {
       try {
@@ -73,8 +74,14 @@ app.get('/auth/debug', async (req, res) => {
           `https://graph.facebook.com/v18.0/${manualId}?fields=name,instagram_business_account{id,username}&access_token=${token}`,
         );
         manualResult = manualRes.data;
-      } catch (e: any) {
-        manualResult = { error: e.response?.data?.error?.message || e.message };
+      } catch (e: unknown) {
+        let msg = 'Unknown manual lookup error';
+        if (axios.isAxiosError(e)) {
+          msg = e.response?.data?.error?.message || e.message;
+        } else if (e instanceof Error) {
+          msg = e.message;
+        }
+        manualResult = { error: msg };
       }
     }
     // -----------------------
@@ -82,7 +89,7 @@ app.get('/auth/debug', async (req, res) => {
     let html = `<h1>🔍 Auth Debugger</h1>`;
     html += `<p><strong>Logged in as:</strong> ${user.name} <span style="font-size:0.8em; opacity:0.7">(ID: ${user.id})</span></p>`;
 
-    if (manualId) {
+    if (manualId && manualResult) {
       html += `<p><strong>Manual Lookup (ID: ${manualId}):</strong> `;
       if (manualResult.error) {
         html += `<span style="color:red">❌ Failed: ${manualResult.error}</span></p>`;
@@ -92,8 +99,6 @@ app.get('/auth/debug', async (req, res) => {
         html += `<span style="color:green">✅ Found: ${manualResult.name} (IG Linked: ${igName})</span></p>`;
       }
     }
-
-    html += `<h3>🔑 Granted Permissions:</h3>`;
 
     html += `<h3>🔑 Granted Permissions:</h3>`;
     if (grantedPerms.length === 0) {
@@ -120,7 +125,7 @@ app.get('/auth/debug', async (req, res) => {
       html += `<p style="color:red">⚠️ No Pages found. You likely unchecked the "Facebook Page" permission during login.</p>`;
     } else {
       html += `<ul>`;
-      pages.forEach((p: any) => {
+      pages.forEach((p: FacebookPage) => {
         const hasIg = !!p.instagram_business_account;
         const style = hasIg ? 'color:green; font-weight:bold' : 'color:gray';
         const icon = hasIg ? '✅' : '❌';
@@ -142,12 +147,14 @@ app.get('/auth/debug', async (req, res) => {
     }
 
     res.send(html);
-  } catch (e: any) {
-    res
-      .status(500)
-      .send(
-        `<h3>❌ API Error</h3><pre>${JSON.stringify(e.response?.data || e.message, null, 2)}</pre>`,
-      );
+  } catch (e: unknown) {
+    let errorData = 'Unknown error';
+    if (axios.isAxiosError(e)) {
+      errorData = JSON.stringify(e.response?.data || e.message, null, 2);
+    } else if (e instanceof Error) {
+      errorData = e.message;
+    }
+    res.status(500).send(`<h3>❌ API Error</h3><pre>${errorData}</pre>`);
   }
 });
 
@@ -209,11 +216,16 @@ app.get('/auth/instagram/callback', async (req, res) => {
       <p>Your Access Token has been logged to the server console.</p>
       <p>You can now close this window.</p>
     `);
-  } catch (err: any) {
-    console.error('Token Exchange Error:', err.response?.data || err.message);
-    res
-      .status(500)
-      .send(`Error exchanging token: ${JSON.stringify(err.response?.data || err.message)}`);
+  } catch (err: unknown) {
+    let errorData = 'Unknown error';
+    if (axios.isAxiosError(err)) {
+      errorData = JSON.stringify(err.response?.data || err.message);
+      console.error('Token Exchange Error:', err.response?.data || err.message);
+    } else if (err instanceof Error) {
+      errorData = err.message;
+      console.error('Token Exchange Error:', err.message);
+    }
+    res.status(500).send(`Error exchanging token: ${errorData}`);
   }
 });
 
@@ -230,7 +242,7 @@ const serverStats = {
   success: 0,
   failed: 0,
 };
-const activeSessions: any[] = [];
+const activeSessions: ActiveSession[] = [];
 
 // Socket.io connection
 io.on('connection', (socket) => {
@@ -339,7 +351,7 @@ io.on('connection', (socket) => {
       await startAnalysis(
         { postUrl, competitors: compsArray },
         (msg) => socket.emit('log', msg),
-        (result) => {
+        (result: { error?: string }) => {
           if (result.error) serverStats.failed++;
           else serverStats.success++;
           socket.emit('result', result);
@@ -360,7 +372,8 @@ io.on('connection', (socket) => {
 });
 
 httpServer.listen(PORT, () => {
-  console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server running at: http://localhost:${PORT}`);
+  console.log(`Admin Console at: http://localhost:${PORT}/admin`);
   if (process.env.ACCESS_CODE) {
     console.log('🔒 Access Code Protection: ENABLED');
   } else {
