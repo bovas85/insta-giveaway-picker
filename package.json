@@ -5,7 +5,7 @@
   "main": "index.ts",
   "scripts": {
     "serve": "ts-node src/server/index.ts",
-    "build": "npm run build:css && tsc && npm run scan",
+    "build": "npm run build:css && npm test && tsc && npm run scan",
     "scan": "node scripts/scan.js . --fail-on=warning",
     "start": "node dist/server/index.js",
     "test": "jest",
