@@ -7,3 +7,4 @@ temp_sessions
 *.log
 .DS_Store
 Thumbs.db
+src/client/output.css
