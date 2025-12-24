@@ -60,6 +60,33 @@ A standalone version that runs entirely in your browser. No server or technical 
     - **Run:** Click the extension icon, enter Competitor Handles, and hit **Start Search**.
     - _Important: Keep the Instagram tab open and active while it works._
 
+## Contributing
+
+We welcome contributions! If you'd like to improve the project, please follow these steps:
+
+1.  **Fork the Repository:** Click the "Fork" button on GitHub to create your own copy of the project.
+2.  **Clone Your Fork:**
+    ```bash
+    git clone https://github.com/YOUR_USERNAME/insta-analyzer.git
+    cd insta-analyzer
+    ```
+3.  **Create a New Branch:**
+    ```bash
+    git checkout -b feature/your-feature-name
+    ```
+4.  **Make Changes:** Implement your feature or fix.
+5.  **Commit Your Changes:**
+    ```bash
+    git commit -m "feat: add amazing new feature"
+    ```
+6.  **Push to Your Fork:**
+    ```bash
+    git push origin feature/your-feature-name
+    ```
+7.  **Open a Pull Request:** Go to the original repository on GitHub and click "New Pull Request".
+
+Please ensure your code follows the existing style and conventions.
+
 ## License
 
 MIT
