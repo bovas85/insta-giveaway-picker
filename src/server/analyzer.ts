@@ -28,7 +28,6 @@ async function getCommentersAPI(postUrl: string, accessToken: string, onLog: (m:
         let igId = page?.instagram_business_account?.id;
 
         // --- Fallback for "Hidden" Pages ---
-        let igId = page?.instagram_business_account?.id;
         
         if (!igId) {
             const manualId = process.env.MANUAL_PAGE_ID;

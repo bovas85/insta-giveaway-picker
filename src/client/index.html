@@ -70,11 +70,11 @@
                 <div id="loginButtons" class="hidden flex gap-4">
                     <button id="browserLoginBtn" onclick="openLogin()" 
                         class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition border border-gray-600">
-                        Browser Login (Manual)
+                        Browser Login (Required)
                     </button>
                     <a id="apiLoginBtn" href="/auth/instagram" target="_blank"
                         class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-6 rounded-lg transition text-center block">
-                        API Login (Graph API)
+                        API Login (Optional - Faster)
                     </a>
                 </div>
                 <div id="reauthHint" class="hidden text-center text-xs text-gray-500 cursor-pointer hover:text-gray-300 underline" onclick="showLoginButtons()">
@@ -85,8 +85,8 @@
 
         <!-- Graph API Info (Hidden if connected) -->
         <div id="apiInfo" class="hidden bg-blue-900/30 border border-blue-500/50 rounded-xl p-4 mb-8 text-sm">
-            <h3 class="font-bold text-blue-400 mb-1">Graph API Mode:</h3>
-            <p class="text-gray-300">Use <strong>API Login</strong> to get your access token. This is more stable than Browser Login but requires a Meta App.</p>
+            <h3 class="font-bold text-blue-400 mb-1">Graph API Mode (Optional):</h3>
+            <p class="text-gray-300">Use <strong>API Login</strong> for ultra-fast comment fetching (requires a Business Account). If skipped, the tool will just use the browser to scrape comments.</p>
         </div>
 
         <!-- Winner Reveal -->

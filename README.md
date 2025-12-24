@@ -8,49 +8,53 @@ A hybrid tool to analyze Instagram giveaway comments using both the **Instagram 
 - **Multi-User Support:** Allows up to 3 concurrent analyses using isolated sessions.
 - **Secure:** Admin tools and login features are protected by an Access Code.
 
-## Setup
+## Usage Modes
 
-1.  **Install Dependencies:**
-    ```bash
-    npm install
-    ```
+This tool can be used in three ways:
+1.  **Local (No Setup):** Run on your own computer. Uses "Browser Login" to scrape comments. No tunnel or Meta App needed.
+2.  **Public/API Mode (Cloudflare Required):** Generates a secure URL so you can:
+    *   **Use the Graph API:** For ultra-fast comment fetching (requires a Meta App).
+    *   **Remote Access:** Use the dashboard from your phone or any other device.
+3.  **Chrome Extension:** A standalone browser tool. No server or setup required.
 
-2.  **Configuration:**
-    Create a `.env` file in the root directory:
-    ```env
-    # App Credentials (From Meta Developer Portal)
-    INSTAGRAM_APP_ID=your_app_id
-    INSTAGRAM_APP_SECRET=your_app_secret
-    
-    # Your Public URL (e.g. from Cloudflare)
-    PUBLIC_URL=https://your-tunnel-url.trycloudflare.com
-    
-    # Security
-    ACCESS_CODE=user_password
-    ADMIN_CODE=admin_password
-    
-    # Optional: If your Facebook Page is hidden from the API list
-    MANUAL_PAGE_ID=your_page_id
-    
-    # Optional: Set to false to see the browser window
-    HEADLESS=true
-    ```
+---
 
-3.  **Run the Server:**
-    ```bash
-    npm run serve
-    ```
+## Quick Start (Local Mode)
+1.  **Install:** `npm install`
+2.  **Run:** `npm run serve` (or double-click `Run_Analyzer.bat`)
+3.  **Open:** Go to `http://localhost:3000` in your browser.
+4.  **Login:** Click **ADMIN** (⚙️), then click **Browser Login (Required)** to save your Instagram session.
+5.  **Analyze:** Enter the Post URL, Competitors, and click **Start Analysis**.
 
-## Usage
-1.  Open the dashboard in your browser.
-2.  **First Time Setup:**
-    *   Enter your `ADMIN_CODE` and click the ⚙️ icon.
-    *   Click **API Login** to connect your Facebook/Instagram account.
-    *   Click **Browser Login** to save a session for following checks.
-3.  **Run Analysis:**
-    *   Enter the Post URL and Competitors.
-    *   Enter the `ACCESS_CODE` (if required).
-    *   Click **Start Analysis**.
+---
+
+## Public & API Setup (Optional)
+If you want to use the **API Login** or access the tool from your phone, you must set up a tunnel.
+
+1.  **Download:** Install `cloudflared` by following the [official installation guide](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/install-and-setup/installation/).
+2.  **Run Tunnel:** 
+    *   **Windows:** `Start_Public_URL.bat`
+    *   **macOS/Linux:** `chmod +x Start_Public_URL.sh && ./Start_Public_URL.sh`
+3.  **Copy URL:** Copy the `https://random-name.trycloudflare.com` link.
+4.  **Configure `.env`:**
+    *   Set `PUBLIC_URL=https://your-tunnel-url.trycloudflare.com`.
+    *   (For API) Add your `INSTAGRAM_APP_ID` and `SECRET`.
+5.  **Update Meta Dashboard:** Add your `PUBLIC_URL + /auth/instagram/callback` to the **Valid OAuth Redirect URIs** in your Meta App settings.
+
+
+## Chrome Extension (Sideloading & Usage)
+A standalone version that runs entirely in your browser. No server or technical setup required.
+
+1.  **Sideloading (Installation):**
+    *   Open Google Chrome and navigate to `chrome://extensions`.
+    *   Toggle **Developer Mode** on (top right corner).
+    *   Click the **Load Unpacked** button (top left).
+    *   Select the `chrome-extension` folder located inside this project directory.
+2.  **Usage:**
+    *   **Pin it:** Click the puzzle piece icon 🧩 in Chrome and pin **InstaPick Pro**.
+    *   **Navigate:** Go to the Instagram post you want to analyze.
+    *   **Run:** Click the extension icon, enter Competitor Handles, and hit **Start Search**.
+    *   *Important: Keep the Instagram tab open and active while it works.*
 
 ## License
 MIT
