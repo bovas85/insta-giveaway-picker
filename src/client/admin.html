@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Insta Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'JetBrains Mono', monospace; }
+        .card { background: rgba(17, 24, 39, 0.7); border: 1px solid rgba(75, 85, 99, 0.4); }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-300 min-h-screen p-8">
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+        <div class="bg-gray-900 p-8 rounded-xl border border-gray-700 w-96 text-center">
+            <h2 class="text-xl font-bold text-white mb-4">Admin Access</h2>
+            <input type="password" id="adminCode" placeholder="Enter ADMIN_CODE" 
+                class="w-full bg-gray-800 border border-gray-600 rounded p-3 text-white mb-4 focus:border-pink-500 outline-none">
+            <button onclick="login()" class="w-full bg-pink-600 hover:bg-pink-500 text-white font-bold py-3 rounded transition">
+                Authenticate
+            </button>
+            <p id="errorMsg" class="text-red-500 text-sm mt-3 hidden"></p>
+        </div>
+    </div>
+
+    <!-- Dashboard Content -->
+    <div id="dashboard" class="max-w-6xl mx-auto hidden">
+        <header class="flex justify-between items-center mb-8">
+            <h1 class="text-2xl font-bold text-white flex items-center gap-2">
+                <span class="text-pink-500">⚡</span> Admin Dashboard
+            </h1>
+            <div class="flex gap-4 text-sm">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                    Server Online
+                </div>
+                <button onclick="logout()" class="text-gray-500 hover:text-white">Logout</button>
+            </div>
+        </header>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="card rounded-lg p-5">
+                <div class="text-gray-500 text-xs uppercase font-bold mb-1">Active Scans</div>
+                <div class="text-3xl font-bold text-white" id="activeScans">0</div>
+                <div class="text-xs text-gray-500 mt-2">Max Capacity: <span id="maxConcurrent">3</span></div>
+            </div>
+            
+            <div class="card rounded-lg p-5">
+                <div class="text-gray-500 text-xs uppercase font-bold mb-1">Total Scans</div>
+                <div class="text-3xl font-bold text-white" id="totalScans">0</div>
+                <div class="flex gap-2 text-xs mt-2">
+                    <span class="text-green-500">✔ <span id="successScans">0</span></span>
+                    <span class="text-red-500">✖ <span id="failedScans">0</span></span>
+                </div>
+            </div>
+
+            <div class="card rounded-lg p-5">
+                <div class="text-gray-500 text-xs uppercase font-bold mb-1">Memory Usage</div>
+                <div class="text-3xl font-bold text-white" id="memUsage">0 MB</div>
+                <div class="text-xs text-gray-500 mt-2">RSS (Process)</div>
+            </div>
+
+            <div class="card rounded-lg p-5">
+                <div class="text-gray-500 text-xs uppercase font-bold mb-1">Uptime</div>
+                <div class="text-3xl font-bold text-white" id="uptime">0s</div>
+                <div class="text-xs text-gray-500 mt-2">Since Start</div>
+            </div>
+        </div>
+
+        <!-- Active Sessions -->
+        <div class="card rounded-lg p-6 mb-8">
+            <h2 class="text-lg font-bold text-white mb-4">Active Sessions</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead>
+                        <tr class="text-gray-500 border-b border-gray-700">
+                            <th class="pb-3">Session ID</th>
+                            <th class="pb-3">Start Time</th>
+                            <th class="pb-3">Target Post</th>
+                            <th class="pb-3">Competitors</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sessionsTable" class="text-gray-300">
+                        <tr>
+                            <td colspan="4" class="py-4 text-center text-gray-600 italic">No active sessions</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- System Load -->
+        <div class="card rounded-lg p-6">
+            <h2 class="text-lg font-bold text-white mb-4">System Resources</h2>
+            <div class="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                    <span class="text-gray-500">Heap Used:</span>
+                    <span class="text-white ml-2" id="heapUsed">0 MB</span>
+                </div>
+                <div>
+                    <span class="text-gray-500">System Total:</span>
+                    <span class="text-white ml-2" id="sysTotal">0 GB</span>
+                </div>
+                <div>
+                    <span class="text-gray-500">Load Average (1m):</span>
+                    <span class="text-white ml-2" id="loadAvg">0.00</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let statsInterval;
+
+        function login() {
+            const code = document.getElementById('adminCode').value;
+            if (!code) return;
+            
+            // First time check
+            socket.emit('get-admin-stats', code);
+        }
+
+        function logout() {
+            localStorage.removeItem('adminCode');
+            clearInterval(statsInterval);
+            location.reload();
+        }
+
+        socket.on('admin-error', (msg) => {
+            const err = document.getElementById('errorMsg');
+            err.innerText = msg;
+            err.classList.remove('hidden');
+        });
+
+        socket.on('admin-stats', (stats) => {
+            // Success - Hide Login, Show Dash
+            document.getElementById('loginModal').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+
+            // Save code for auto-refresh
+            const code = document.getElementById('adminCode').value;
+            if (code) localStorage.setItem('adminCode', code);
+
+            // Update UI
+            document.getElementById('activeScans').innerText = stats.activeScans;
+            document.getElementById('maxConcurrent').innerText = stats.maxConcurrent;
+            document.getElementById('totalScans').innerText = stats.totalScans;
+            document.getElementById('successScans').innerText = stats.success;
+            document.getElementById('failedScans').innerText = stats.failed;
+            
+            document.getElementById('memUsage').innerText = stats.memory.rss;
+            document.getElementById('heapUsed').innerText = stats.memory.heapUsed;
+            document.getElementById('sysTotal').innerText = stats.memory.totalSystem;
+            
+            document.getElementById('loadAvg').innerText = stats.loadAvg[0].toFixed(2);
+
+            // Format Uptime
+            const h = Math.floor(stats.uptime / 3600);
+            const m = Math.floor((stats.uptime % 3600) / 60);
+            const s = stats.uptime % 60;
+            document.getElementById('uptime').innerText = `${h}h ${m}m ${s}s`;
+
+            // Table
+            const tbody = document.getElementById('sessionsTable');
+            if (stats.sessions.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-gray-600 italic">No active sessions</td></tr>';
+            } else {
+                tbody.innerHTML = stats.sessions.map(sess => `
+                    <tr class="border-b border-gray-800 hover:bg-gray-800/50">
+                        <td class="py-3 font-mono text-xs text-pink-400">${sess.id}</td>
+                        <td class="py-3">${new Date(sess.startTime).toLocaleTimeString()}</td>
+                        <td class="py-3 max-w-[200px] truncate" title="${sess.url}">
+                            <a href="${sess.url}" target="_blank" class="text-blue-400 hover:underline">View Post</a>
+                        </td>
+                        <td class="py-3">${sess.competitors}</td>
+                    </tr>
+                `).join('');
+            }
+
+            // Start polling if not started
+            if (!statsInterval) {
+                statsInterval = setInterval(() => {
+                    const savedCode = localStorage.getItem('adminCode');
+                    if (savedCode) socket.emit('get-admin-stats', savedCode);
+                }, 2000);
+            }
+        });
+
+        // Auto-login check
+        window.onload = () => {
+            const savedCode = localStorage.getItem('adminCode');
+            if (savedCode) {
+                document.getElementById('adminCode').value = savedCode;
+                login();
+            }
+        }
+    </script>
+</body>
+</html>

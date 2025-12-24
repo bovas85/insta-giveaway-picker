@@ -3,6 +3,7 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 import dotenv from "dotenv";
 import axios from "axios";
 import { startAnalysis, openLoginBrowser } from "./analyzer";
@@ -28,6 +29,10 @@ app.use(express.static(clientPath));
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(clientPath, "index.html"));
+});
+
+app.get("/admin", (req, res) => {
+  res.sendFile(path.join(clientPath, "admin.html"));
 });
 
 // --- Instagram Graph API Auth Flow ---
@@ -203,6 +208,15 @@ app.get("/auth/instagram/callback", async (req, res) => {
 let activeScans = 0;
 const MAX_CONCURRENT = 3;
 
+// Admin Stats
+const serverStartTime = Date.now();
+const serverStats = {
+    totalScans: 0,
+    success: 0,
+    failed: 0,
+};
+const activeSessions: any[] = [];
+
 // Socket.io connection
 io.on("connection", (socket) => {
   // ... (auth status logic) ...
@@ -228,6 +242,34 @@ io.on("connection", (socket) => {
       } else {
           socket.emit("log", "⛔ Admin Access Denied.");
       }
+  });
+
+  // Admin Stats Request
+  socket.on("get-admin-stats", (code: string) => {
+      const adminCode = process.env.ADMIN_CODE;
+      if (!adminCode || code !== adminCode) {
+          socket.emit("admin-error", "Invalid Admin Code");
+          return;
+      }
+
+      const memUsage = process.memoryUsage();
+      const stats = {
+          uptime: Math.floor((Date.now() - serverStartTime) / 1000),
+          activeScans,
+          maxConcurrent: MAX_CONCURRENT,
+          totalScans: serverStats.totalScans,
+          success: serverStats.success,
+          failed: serverStats.failed,
+          memory: {
+              rss: Math.round(memUsage.rss / 1024 / 1024) + " MB",
+              heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024) + " MB",
+              totalSystem: Math.round(os.totalmem() / 1024 / 1024) + " MB"
+          },
+          loadAvg: os.loadavg(),
+          sessions: activeSessions
+      };
+      
+      socket.emit("admin-stats", stats);
   });
 
   socket.on("start-analysis", async (data) => {
@@ -257,19 +299,38 @@ io.on("connection", (socket) => {
 
     // Run the analyzer
     activeScans++;
+    serverStats.totalScans++;
+    
+    const sessionId = Date.now().toString();
+    const sessionData = {
+        id: sessionId,
+        url: postUrl,
+        startTime: new Date().toISOString(),
+        competitors: compsArray.length
+    };
+    activeSessions.push(sessionData);
+
     socket.emit("log", `🚦 Job started (Active: ${activeScans}/${MAX_CONCURRENT})`);
     
     try {
         await startAnalysis(
             { postUrl, competitors: compsArray }, 
             (msg) => socket.emit("log", msg),
-            (result) => socket.emit("result", result)
+            (result) => {
+                if (result.error) serverStats.failed++;
+                else serverStats.success++;
+                socket.emit("result", result);
+            }
         );
     } catch (e) {
         // Error handling is mostly done inside startAnalysis, but just in case
         console.error("Handler error:", e);
+        serverStats.failed++;
     } finally {
         activeScans--;
+        // Remove from active sessions
+        const idx = activeSessions.findIndex(s => s.id === sessionId);
+        if (idx !== -1) activeSessions.splice(idx, 1);
         // socket.emit("log", `🚦 Job finished (Active: ${activeScans}/${MAX_CONCURRENT})`);
     }
   });
